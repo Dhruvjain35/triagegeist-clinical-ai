@@ -23,7 +23,7 @@ Standard machine learning models output point predictions, which force the AI to
 Machine learning models trained on historical hospital data run the risk of inheriting and amplifying human biases. To guarantee equitable healthcare delivery, Triagegeist executes an automated fairness audit. It runs strict parity and disparate impact checks, slicing the performance metrics across protected demographic groups (such as race, gender, and age). This ensures the algorithm does not systematically under-triage specific populations.
 
 ### 5. Human-in-the-Loop Benchmarking (Nurse Variability)
-An AI's performance cannot be evaluated in a vacuum; it must be contextualized against existing clinical workflows. Triagegeist includes an analysis module that quantifies historical triage nurse variability—measuring how often human nurses disagree on the same patient profile. By benchmarking the AI's predictions against this baseline, we mathematically demonstrate that the model's error rate is highly competitive with, or superior to, standard human disagreement in the Emergency Department.
+An AI's performance cannot be evaluated in a vacuum; it must be contextualized against existing clinical workflows. Triagegeist includes an analysis module that quantifies historical triage nurse variability, measuring how often human nurses disagree on the same patient profile. By benchmarking the AI's predictions against this baseline, we mathematically demonstrate that the model's error rate is highly competitive with, or superior to, standard human disagreement in the Emergency Department.
 
 ## Installation and Usage
 
