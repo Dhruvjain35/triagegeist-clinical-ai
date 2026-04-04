@@ -1,33 +1,177 @@
-# Triagegeist: Robust Clinical Triage AI Pipeline
+# Triagegeist: Clinical AI Pipeline for Emergency Triage Acuity Prediction
+
+A stacked ensemble clinical decision support system for predicting Emergency Severity Index (ESI) levels in emergency department triage. Built for the [Triagegeist Competition](https://www.kaggle.com/competitions/triagegeist) hosted by the Laitinen-Fredriksson Foundation.
+
+**Final OOF QWK: 0.9989 | +0.2266 over NEWS2 clinical baseline**
+
+---
 
 ## Overview
-Triagegeist is an end-to-end machine learning pipeline designed for Emergency Department (ED) triage classification. 
 
-In high-stakes healthcare environments, optimizing a model solely for raw accuracy is insufficient and potentially dangerous. Clinical deployment requires trust, transparency, and an understanding of the model's limitations. To bridge this gap, Triagegeist is engineered with advanced uncertainty quantification, deep model interpretability, and strict algorithmic fairness auditing. It provides healthcare professionals with reliable, equitable, and transparent triage recommendations.
+Emergency department triage nurses assign ESI acuity levels (1–5) under extreme cognitive load with incomplete information. Inter-rater variability (kappa 0.60–0.80) and systematic undertriage of vulnerable populations are well-documented patient safety concerns. This project builds an AI-powered second opinion that is fast, consistent, and auditable.
 
-## Core Architecture
-The predictive engine utilizes Tree-Based Gradient Boosting (specifically XGBoost and LightGBM). This architecture was selected for its superior performance on tabular clinical data, effectively processing structured inputs such as patient vital signs, demographics, and initial triage nurse assessments without requiring complex deep learning architectures that are harder to interpret.
+### Key Features
 
-## Key Features & Pipeline Analysis
+- **Stacked Ensemble Architecture** — LightGBM + XGBoost + CatBoost base learners with a logistic regression meta-learner
+- **Dual-Channel NLP** — Word-level (1–3 grams) and character-level (2–5 grams) TF-IDF on chief complaint text
+- **Conformal Prediction** — Distribution-free prediction sets with guaranteed 90% coverage for uncertainty quantification
+- **Clinical Cost Analysis** — Asymmetric cost matrix reflecting that undertriage is far more dangerous than overtriage
+- **Demographic Bias Audit** — Chi-squared significance testing across sex, insurance, language, and age group
+- **Ablation Study** — Systematic feature group removal quantifying each component's contribution
+- **SHAP Interpretability** — Global and per-class feature explanations for clinical auditability
+- **Nurse-Level Variability Analysis** — ANOVA-based inter-rater variability assessment across 50 triage nurses
 
-### 1. Model Performance and Calibration
-While the model achieves robust discrimination across all triage acuity levels, its primary strength lies in its calibration. Triagegeist ensures that the predicted probabilities align strictly with real-world observed frequencies. For instance, if the model predicts a 15% probability of a patient requiring immediate resuscitation, the actual historical frequency for that patient profile is consistently near 15%. This calibration prevents overconfident but incorrect predictions.
+---
 
-### 2. Clinical Interpretability (SHAP)
-To eliminate the "black box" problem inherent in many AI systems, the pipeline integrates SHapley Additive exPlanations (SHAP). SHAP dynamically maps exactly how each feature influences the model's final decision. By explicitly showing how vital signs (e.g., NEWS2 scores, heart rate, or oxygen saturation) push the prediction toward a specific triage level, the model allows attending physicians to verify the clinical logic behind every recommendation.
+## Results
 
-### 3. Uncertainty Quantification (Conformal Prediction)
-Standard machine learning models output point predictions, which force the AI to guess even when it is uncertain. Triagegeist implements Conformal Prediction to solve this. Instead of a single triage level, the model outputs a statistically rigorous "prediction set." We guarantee that the true triage level is contained within this set with a user-defined confidence level (e.g., 95%). If a patient's presentation is highly ambiguous, the prediction set naturally widens, signaling to the physician that human judgment must take precedence.
+| Model | OOF QWK |
+|-------|---------|
+| LightGBM | 0.9988 |
+| XGBoost | 0.9988 |
+| CatBoost | 0.9975 |
+| Weighted Average | 0.9987 |
+| **Stacked Meta-Learner** | **0.9989** |
+| NEWS2 Baseline | 0.7723 |
 
-### 4. Algorithmic Bias and Fairness Auditing
-Machine learning models trained on historical hospital data run the risk of inheriting and amplifying human biases. To guarantee equitable healthcare delivery, Triagegeist executes an automated fairness audit. It runs strict parity and disparate impact checks, slicing the performance metrics across protected demographic groups (such as race, gender, and age). This ensures the algorithm does not systematically under-triage specific populations.
+- **416 engineered features** from 4 source files
+- **99.78% accuracy** on out-of-fold predictions
+- **No statistically significant bias** across any demographic group (all p > 0.05)
+- **98.8% empirical coverage** at 90% conformal prediction target
+- NLP features identified as the single most critical component (ablation Δ = -0.0642 QWK)
 
-### 5. Human-in-the-Loop Benchmarking (Nurse Variability)
-An AI's performance cannot be evaluated in a vacuum; it must be contextualized against existing clinical workflows. Triagegeist includes an analysis module that quantifies historical triage nurse variability, measuring how often human nurses disagree on the same patient profile. By benchmarking the AI's predictions against this baseline, we mathematically demonstrate that the model's error rate is highly competitive with, or superior to, standard human disagreement in the Emergency Department.
+---
 
-## Installation and Usage
+## Repository Structure
 
-1. Clone the repository:
-   ```bash
-   git clone [https://github.com/YourUsername/Triagegeist.git](https://github.com/YourUsername/Triagegeist.git)
-   cd Triagegeist
+```
+.
+├── triagegeist-clinical-ai-pipeline.ipynb   # Main notebook (runs end-to-end on Kaggle)
+├── README.md                                 # This file
+└── submission.csv                            # Test set predictions (20,000 patients)
+```
+
+---
+
+## Pipeline Architecture
+
+```
+Input Data (4 tables)
+    │
+    ▼
+Feature Engineering (416 features)
+    ├── Vital sign flags & missingness indicators
+    ├── Comorbidity burden & high-risk clusters
+    ├── Temporal features (cyclical hour, weekend)
+    ├── High-risk keyword flags (15 patterns)
+    └── Dual-channel TF-IDF (200 word + 100 char)
+    │
+    ▼
+Level-1: Base Models (5-fold stratified CV)
+    ├── LightGBM  (leaf-wise, QWK: 0.9988)
+    ├── XGBoost   (level-wise, QWK: 0.9988)
+    └── CatBoost  (ordered boosting, QWK: 0.9975)
+    │
+    ▼
+Level-2: Stacking Meta-Learner
+    └── Logistic Regression on 15-dim OOF probability space
+    │
+    ▼
+Post-Prediction Analysis
+    ├── Conformal prediction (90% coverage sets)
+    ├── Clinical cost analysis (asymmetric cost matrix)
+    ├── SHAP interpretability (global + ESI-1 specific)
+    ├── Demographic bias audit (chi-squared tests)
+    ├── Nurse-level variability (ANOVA)
+    └── Ablation study (feature group contributions)
+```
+
+---
+
+## How to Run
+
+### On Kaggle (Recommended)
+
+1. Go to the [notebook on Kaggle](https://www.kaggle.com/code/dhruvjain35/triagegeist-clinical-ai-pipeline)
+2. Click **Copy & Edit**
+3. Ensure the Triagegeist competition dataset is attached
+4. Click **Run All**
+5. Runtime: ~2.5 hours on T4 GPU
+
+### Locally
+
+```bash
+# Clone the repository
+git clone https://github.com/Dhruvjain35/triagegeist-clinical-ai.git
+cd triagegeist-clinical-ai
+
+# Install dependencies
+pip install pandas numpy matplotlib seaborn scikit-learn lightgbm xgboost catboost shap scipy
+
+# Download the dataset from Kaggle
+kaggle competitions download -c triagegeist
+unzip triagegeist.zip -d data/
+
+# Update PATH in the notebook to point to your local data directory
+# Then run the notebook
+jupyter notebook triagegeist-clinical-ai-pipeline.ipynb
+```
+
+---
+
+## Dataset
+
+- **Source:** Triagegeist Synthetic ED Dataset, Laitinen-Fredriksson Foundation
+- **Access:** [kaggle.com/competitions/triagegeist/data](https://kaggle.com/competitions/triagegeist/data)
+- **License:** Non-Commercial Research License
+- **Files:** `train.csv` (80,000 patients), `test.csv` (20,000 patients), `chief_complaints.csv`, `patient_history.csv`
+- **Note:** All records are fully synthetic. No real patient data is used.
+
+---
+
+## Key Findings
+
+1. **NLP is critical** — Removing all NLP features drops QWK by 0.0642. Character-level TF-IDF alone contributes 0.0048, validating the dual-channel approach for capturing misspellings and abbreviations in triage nurse documentation.
+
+2. **Pain score is the strongest single predictor** — Consistent with ESI's resource-based classification where pain drives resource utilization estimates.
+
+3. **NEWS2 and GCS dominate ESI-1 predictions** — SHAP analysis shows GCS total is the primary driver for critical (ESI-1) predictions, aligning with the ESI algorithm's emphasis on altered consciousness.
+
+4. **No demographic bias detected** — Chi-squared tests show no significant undertriage differences across sex, insurance, language, or age group. The Somali language subgroup shows a marginally elevated critical miss rate (2.0%) warranting prospective monitoring.
+
+5. **Stacking outperforms averaging** — The meta-learner improves QWK by +0.0002 over weighted averaging, with the largest gains on borderline ESI 1/2 cases.
+
+---
+
+## Limitations
+
+- Synthetic dataset — requires validation on real clinical data (e.g., MIMIC-IV-ED)
+- NEWS2 as a pre-computed feature partially encodes existing triage logic
+- TF-IDF misses semantic nuance — clinical language models would improve NLP
+- No temporal validation (time-based splits would better simulate deployment)
+- Single-snapshot prediction without reassessment dynamics
+- No external validation on held-out institutions
+
+---
+
+## Competition
+
+- **Competition:** [Triagegeist — Laitinen-Fredriksson Foundation](https://www.kaggle.com/competitions/triagegeist)
+- **Task:** Predict ESI triage acuity (1–5) from ED intake data
+- **Evaluation:** Judged by clinical relevance, technical quality, documentation, insights, and novelty
+- **Prize Pool:** $10,000
+
+---
+
+## Citation
+
+```
+Olaf Yunus Laitinen Imanov (2026). Triagegeist. Kaggle.
+https://kaggle.com/competitions/triagegeist
+```
+
+---
+
+## License
+
+This project is for non-commercial and academic research use only, per the competition data license.
